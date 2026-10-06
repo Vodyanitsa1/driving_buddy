@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:camera/camera.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -134,7 +133,7 @@ class WeeklySummary {
 
 final List<TripRecord> dummyTripRecords = [
   TripRecord(
-    routeName: 'Tol Cipularang (KM 72 – 120)',
+    routeName: 'Amphoreus (KM 72 – 120)',
     dateInfo: 'Malam ini',
     timeRange: '21:15 – 23:30',
     duration: '02:15:00',
@@ -146,7 +145,7 @@ final List<TripRecord> dummyTripRecords = [
     earGraphData: [0.32, 0.30, 0.28, 0.31, 0.27, 0.29, 0.26, 0.30, 0.28],
   ),
   TripRecord(
-    routeName: 'Jakarta – Bogor (Jagorawi)',
+    routeName: 'Nodkrai – Snezhnaya (Eye of Graeae)',
     dateInfo: 'Kemarin',
     timeRange: '08:10 – 10:10',
     duration: '01:40:00',
@@ -158,7 +157,7 @@ final List<TripRecord> dummyTripRecords = [
     earGraphData: [0.34, 0.35, 0.36, 0.34, 0.35, 0.33, 0.36, 0.35, 0.34],
   ),
   TripRecord(
-    routeName: 'Cirebon – Semarang (Trans Ja...)',
+    routeName: 'Monstadt – Liyue (Trans Star Rail)',
     dateInfo: '14 Okt',
     timeRange: '18:00 – 21:45',
     duration: '03:45:00',
@@ -170,7 +169,7 @@ final List<TripRecord> dummyTripRecords = [
     earGraphData: [0.30, 0.28, 0.25, 0.27, 0.22, 0.26, 0.24, 0.28, 0.25],
   ),
   TripRecord(
-    routeName: 'Bandung – Garut (Nagreg)',
+    routeName: 'Amphoreus – Planarcadia',
     dateInfo: '12 Okt',
     timeRange: '06:30 – 08:45',
     duration: '02:15:00',
@@ -191,7 +190,7 @@ final RestAreaRecommendation dummyRestArea = RestAreaRecommendation(
 
 WeeklySummary dummyWeeklySummary = WeeklySummary(
   totalSessions: 12,
-  totalDuration: '24j 40m',
+  totalDuration: '100j 40m',
   safetyScore: 95,
   comparisonText: '↓ 3 sesi dibanding pekan lalu.',
 );
@@ -1002,6 +1001,7 @@ class MonitorScreen extends StatefulWidget {
 
 class MonitorScreenState extends State<MonitorScreen> {
   Timer? _drivingTimer;
+  Timer? _processingTimer;
   int _elapsedSeconds = 0;
   bool _isMonitoring = false;
 
@@ -1227,20 +1227,26 @@ class MonitorScreenState extends State<MonitorScreen> {
 
       // 6. Mulai ambil frame dan kirim ke Python
       _resumeTimer();
-      _cameraController!.startImageStream((CameraImage image) async {
-        if (_isProcessingFrame || !_isMonitoring || _channel == null) return;
-        _isProcessingFrame = true;
-
-        try {
-          final jpegBytes = _convertCameraImageToJpeg(image);
-          if (jpegBytes != null) {
-            final base64Image = base64Encode(jpegBytes);
-            _channel!.sink.add(base64Image);
+      _processingTimer?.cancel();
+      _processingTimer = Timer.periodic(const Duration(milliseconds: 300), (_) async {
+        if (!_isProcessingFrame && _isMonitoring &&
+            _channel != null && _cameraController != null &&
+            (_cameraController?.value.isInitialized ?? false)) {
+          _isProcessingFrame = true;
+          String? tempPath;
+          try {
+            final XFile photo = await _cameraController!.takePicture();
+            tempPath = photo.path;
+            final bytes = await File(tempPath).readAsBytes();
+            _channel?.sink.add(base64Encode(bytes));
+          } catch (e) {
+            debugPrint('Error streaming frame: $e');
+          } finally {
+            _isProcessingFrame = false;
+            if (tempPath != null) {
+              try { await File(tempPath).delete(); } catch (_) {}
+            }
           }
-        } catch (e) {
-          debugPrint('Error streaming frame: $e');
-        } finally {
-          _isProcessingFrame = false;
         }
       });
     } catch (e) {
@@ -1253,82 +1259,6 @@ class MonitorScreenState extends State<MonitorScreen> {
         });
       }
     }
-  }
-
-  // ---------- Konversi CameraImage ke JPEG bytes ----------
-  Uint8List? _convertCameraImageToJpeg(CameraImage image) {
-    try {
-      if (Platform.isAndroid) {
-        // YUV420 (Android): plane[0]=Y, plane[1]=U, plane[2]=V
-        return _convertYuv420ToJpeg(image);
-      } else {
-        // BGRA8888 (iOS): satu plane langsung
-        return _convertBgra8888ToJpeg(image);
-      }
-    } catch (e) {
-      debugPrint('Konversi frame gagal: $e');
-      return null;
-    }
-  }
-
-  Uint8List? _convertYuv420ToJpeg(CameraImage image) {
-    final int width = image.width;
-    final int height = image.height;
-
-    final Uint8List yPlane = image.planes[0].bytes;
-    final Uint8List uPlane = image.planes[1].bytes;
-    final Uint8List vPlane = image.planes[2].bytes;
-
-    final int yRowStride = image.planes[0].bytesPerRow;
-    final int uvRowStride = image.planes[1].bytesPerRow;
-    final int uvPixelStride = image.planes[1].bytesPerPixel ?? 1;
-
-    final imgObj = img.Image(width: width, height: height);
-
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final int yIndex = y * yRowStride + x;
-        final int uvIndex = uvPixelStride * (x >> 1) + uvRowStride * (y >> 1);
-
-        if (yIndex >= yPlane.length) continue;
-        if (uvIndex >= uPlane.length || uvIndex >= vPlane.length) continue;
-
-        final int yVal = yPlane[yIndex] & 0xFF;
-        final int uVal = uPlane[uvIndex] & 0xFF;
-        final int vVal = vPlane[uvIndex] & 0xFF;
-
-        // YUV → RGB (BT.601)
-        final int r = (yVal + 1.402 * (vVal - 128)).round().clamp(0, 255);
-        final int g = (yVal - 0.344136 * (uVal - 128) - 0.714136 * (vVal - 128)).round().clamp(0, 255);
-        final int b = (yVal + 1.772 * (uVal - 128)).round().clamp(0, 255);
-
-        imgObj.setPixelRgb(x, y, r, g, b);
-      }
-    }
-
-    return Uint8List.fromList(img.encodeJpg(imgObj, quality: 60));
-  }
-
-  Uint8List? _convertBgra8888ToJpeg(CameraImage image) {
-    final int width = image.width;
-    final int height = image.height;
-    final Uint8List bytes = image.planes[0].bytes;
-    final int bytesPerRow = image.planes[0].bytesPerRow;
-
-    final imgObj = img.Image(width: width, height: height);
-
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final int index = y * bytesPerRow + x * 4;
-        if (index + 3 >= bytes.length) continue;
-        final int b = bytes[index] & 0xFF;
-        final int g = bytes[index + 1] & 0xFF;
-        final int r = bytes[index + 2] & 0xFF;
-        imgObj.setPixelRgb(x, y, r, g, b);
-      }
-    }
-
-    return Uint8List.fromList(img.encodeJpg(imgObj, quality: 60));
   }
 
   void _resumeTimer() {
@@ -1347,11 +1277,8 @@ class MonitorScreenState extends State<MonitorScreen> {
 
   Future<void> _stopMonitoring() async {
     _pauseTimer();
+    _processingTimer?.cancel();
 
-    if (_cameraController != null &&
-        _cameraController!.value.isStreamingImages) {
-      await _cameraController!.stopImageStream();
-    }
     _cameraController?.dispose();
     _cameraController = null;
     _channel?.sink.close();
