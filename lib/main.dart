@@ -1013,7 +1013,7 @@ class MonitorScreenState extends State<MonitorScreen> {
 
   // Metrik real-time dari Python server
   double _earIndex = 0.00;
-  final String _earRange = 'Ambang > 0.19';
+  final String _earRange = 'Ambang > 0.15';
   String _earStatus = '—';
   int _blinkFrequency = 0;
   int _fatigueScore = 0;
@@ -1703,7 +1703,7 @@ class MonitorScreenState extends State<MonitorScreen> {
           _MetricCard(
             label: 'INDEKS EAR',
             value: _isMonitoring ? _earIndex.toStringAsFixed(2) : '0.00',
-            subtitle: _isMonitoring ? '$_earRange\n$_earStatus' : 'Ambang > 0.19',
+            subtitle: _isMonitoring ? '$_earRange\n$_earStatus' : 'Ambang > 0.15',
             icon: Icons.remove_red_eye_outlined,
             iconColor: Colors.blue,
             dimmed: !_isMonitoring,
