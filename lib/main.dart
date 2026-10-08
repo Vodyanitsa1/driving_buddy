@@ -9,6 +9,7 @@ import 'package:camera/camera.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 // ============================================================================
 // MAIN ENTRY POINT
@@ -1717,7 +1718,7 @@ class MonitorScreenState extends State<MonitorScreen> {
             dimmed: !_isMonitoring,
           ),
           _MetricCard(
-            label: 'SKOR KELELAH.',
+            label: 'SKOR KELELAHAN.',
             value: '$_fatigueScore%',
             subtitle: _isMonitoring ? _fatigueLabel : '—',
             icon: Icons.battery_charging_full_rounded,
@@ -2015,6 +2016,7 @@ class _MicrosleepAlertDialogState extends State<MicrosleepAlertDialog>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -2027,11 +2029,15 @@ class _MicrosleepAlertDialogState extends State<MicrosleepAlertDialog>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     HapticFeedback.heavyImpact();
+    
+    // Putar suara alarm SATU KALI saja
+    _audioPlayer.play(AssetSource('audio/alarm.mp3'));
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -2172,6 +2178,15 @@ class _MicrosleepAlertDialogState extends State<MicrosleepAlertDialog>
           ),
         ),
         const SizedBox(height: 20),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/meme_tidur.png',
+            width: 200,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
