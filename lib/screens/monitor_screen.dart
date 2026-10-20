@@ -20,6 +20,7 @@ import '../supabase_service.dart';
 import '../auth_screen.dart';
 import '../driving_card_screen.dart';
 import '../widgets/driving_buddy_app_bar.dart';
+import '../features/nearby_places/nearby_places.dart';
 
 // ============================================================================
 // MONITOR SCREEN (Kamera + Pemantauan Real-time)
@@ -53,6 +54,9 @@ class MonitorScreenState extends State<MonitorScreen> {
   final DrowsinessDetector _detector = DrowsinessDetector();
   final AlertService _alert = AlertService();
 
+  // Tempat terdekat (Maps API lewat server.py): kartu rekomendasi pitstop & tombol rest area
+  final NearbyPlacesController _nearby = NearbyPlacesController();
+
   // Hasil deteksi real-time
   DetectionResult _result = DetectionResult.initial;
   bool _eyeDetected = false;
@@ -82,6 +86,7 @@ class MonitorScreenState extends State<MonitorScreen> {
     _cameraController?.dispose();
     _mesh.dispose();
     _alert.dispose();
+    _nearby.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -171,6 +176,9 @@ class MonitorScreenState extends State<MonitorScreen> {
       });
       _resumeTimer();
 
+      // Tempat terdekat: ikuti posisi selama sesi berjalan. Semua error ditangani di dalam
+      // controller dan tidak pernah mengganggu deteksi kantuk.
+      unawaited(_nearby.start());
     } catch (e) {
       debugPrint('Init kamera gagal: $e');
       if (mounted) {
@@ -332,6 +340,7 @@ class MonitorScreenState extends State<MonitorScreen> {
     await _cameraController?.dispose();
     _cameraController = null;
     await _alert.stop();
+    _nearby.stop();
     await WakelockPlus.disable();
 
     setState(() {
@@ -423,6 +432,9 @@ class MonitorScreenState extends State<MonitorScreen> {
     if (_isAlertShowing) return;
     _isAlertShowing = true;
 
+    // Alarm bunyi: langsung cari tempat berhenti terdekat (apa pun jenisnya) untuk kartu di dialog.
+    unawaited(_nearby.requestUrgent());
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -431,6 +443,7 @@ class MonitorScreenState extends State<MonitorScreen> {
         title: title,
         subtitle: subtitle,
         reason: reason,
+        nearby: _nearby,
         onDismiss: () async {
           await _alert.stop();
           if (resetYawnsOnDismiss) {
@@ -438,14 +451,22 @@ class MonitorScreenState extends State<MonitorScreen> {
           }
         },
         onRestArea: () async {
+          // Ambil tempat yang sedang tampil di kartu SEKARANG, sebelum dialog ditutup dan
+          // mode darurat dimatikan (kalau tidak, pilihannya bisa berubah di tengah jalan).
+          final target = _nearby.best;
           await _alert.stop();
           if (resetYawnsOnDismiss) {
             _detector.resetYawns();
           }
-          if (mounted) {
+          // Buka Google Maps (mode mobil) ke tempat berhenti terdekat dari server.
+          final opened = target != null
+              ? await _nearby.navigateTo(target)
+              : await _nearby.navigateToBest();
+          if (!opened && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Mengarahkan ke rest area terdekat...'),
+                content: Text(
+                    'Belum ada tempat berhenti yang ditemukan. Menepi di tempat yang aman ya.'),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -454,6 +475,7 @@ class MonitorScreenState extends State<MonitorScreen> {
       ),
     ).whenComplete(() {
       _alert.stop();
+      _nearby.clearUrgent();
       Future.delayed(const Duration(seconds: _alertCooldownSeconds), () {
         if (mounted) setState(() => _isAlertShowing = false);
       });
@@ -888,20 +910,11 @@ class MonitorScreenState extends State<MonitorScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
+          // Rekomendasi pitstop dari Maps API: tombol di kanan = buka Google Maps,
+          // ketuk kartu = daftar rest area / minimarket / hotel-motel / SPBU terdekat.
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Mencari Rest Area terdekat...'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.local_parking_rounded, size: 18),
-              label: const Text('Cari Rest Area Terdekat (4.2 km)'),
-            ),
+            child: PitstopCard(controller: _nearby),
           ),
           const SizedBox(height: 10),
           Row(
@@ -1124,6 +1137,9 @@ class MicrosleepAlertDialog extends StatefulWidget {
   final VoidCallback? onDismiss;
   final VoidCallback? onRestArea;
 
+  /// Sumber tempat berhenti terdekat (Maps API). `null` = kartu contoh bawaan.
+  final NearbyPlacesController? nearby;
+
   const MicrosleepAlertDialog({
     super.key,
     this.title = 'ISTIRAHAT\nSEKARANG',
@@ -1131,6 +1147,7 @@ class MicrosleepAlertDialog extends StatefulWidget {
     this.reason = 'Microsleep terdeteksi. Segera cari tempat aman untuk berhenti.',
     this.onDismiss,
     this.onRestArea,
+    this.nearby,
   });
 
   @override
@@ -1367,6 +1384,19 @@ class _MicrosleepAlertDialogState extends State<MicrosleepAlertDialog>
   }
 
   Widget _buildRecommendationCard() {
+    final nearby = widget.nearby;
+    if (nearby != null) {
+      // Tempat berhenti terdekat dari server (mode darurat). Tombol navigasi kartu
+      // sama dengan tombol "ARAHKAN KE REST AREA TERDEKAT" di bawah.
+      return PitstopCard(
+        controller: nearby,
+        urgent: true,
+        onNavigate: (_) {
+          widget.onRestArea?.call();
+          Navigator.of(context).pop();
+        },
+      );
+    }
     final rest = dummyRestArea;
     return Container(
       padding: const EdgeInsets.all(16),

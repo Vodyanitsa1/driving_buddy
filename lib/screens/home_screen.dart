@@ -4,6 +4,7 @@ import '../core/app_colors.dart';
 import '../models/trip_model.dart';
 import '../routes/app_routes.dart';
 import '../widgets/driving_buddy_app_bar.dart';
+import '../features/nearby_places/nearby_places.dart';
 
 // ============================================================================
 // HOME SCREEN / COCKPIT (Dashboard Beranda — Tanpa Kamera)
@@ -402,14 +403,8 @@ class CockpitScreen extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         child: OutlinedButton.icon(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Mencari Rest Area terdekat...'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
+          // Daftar tempat terdekat dari Maps API (rest area, minimarket, hotel/motel, SPBU).
+          onPressed: () => showNearbyPlacesSheet(context),
           icon: const Icon(Icons.local_parking_rounded, size: 18),
           label: const Text('Cari Rest Area Terdekat'),
         ),

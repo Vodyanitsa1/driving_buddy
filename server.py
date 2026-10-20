@@ -105,6 +105,17 @@ def estimate_head_pose(landmarks, w, h):
     return pitch_ratio, yaw_ratio, roll_angle
 
 # =====================================================================
+# 2b. TEMPAT TERDEKAT (POST /places/nearby) -> folder nearby_places/
+# =====================================================================
+# Rest area / minimarket / hotel-motel terdekat. Opsional: kalau modulnya gagal dimuat,
+# deteksi kantuk (/ws) tetap jalan. API key Google cukup di file .env (lihat README_MAPS.md).
+try:
+    from nearby_places import build_router as build_places_router
+    app.include_router(build_places_router())
+except Exception as e:
+    print(f"[WARN] Modul tempat terdekat tidak dimuat: {e}")
+
+# =====================================================================
 # 3. WEBSOCKET ENDPOINT
 # =====================================================================
 @app.websocket("/ws")
@@ -291,6 +302,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print(" Endpoint : ws://[IP_LAPTOP]:8000/ws")
     print(" Model    : Google MediaPipe Face Mesh (Pretrained)")
+    print(" Tempat   : POST http://[IP_LAPTOP]:8000/places/nearby  (cek: /places/health, dokumen API: /docs)")
     print(" Ctrl+C   : Hentikan server")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=8000)

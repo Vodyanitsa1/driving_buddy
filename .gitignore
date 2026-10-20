@@ -57,6 +57,8 @@ app.*.map.json
 *.env
 env.json
 secrets.json
+# Hitungan pemakaian Google Places (dibuat otomatis oleh server, jangan di-commit)
+.places_usage.json
 
 # Private Dart Config & API Key files
 lib/supabase_config.dart
@@ -88,3 +90,4 @@ macos/Runner/GoogleService-Info.plist
 scratch/
 __pycache__/
 .pytest_cache/
+.places_stale_cache.json
