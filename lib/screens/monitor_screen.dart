@@ -21,6 +21,7 @@ import '../supabase_service.dart';
 import '../auth_screen.dart';
 import '../driving_card_screen.dart';
 import '../widgets/driving_buddy_app_bar.dart';
+import '../features/nearby_places/nearby_places.dart';
 
 // ============================================================================
 // MONITOR SCREEN (Active HUD Berkendara Telemetri — Luxury GT)
@@ -53,6 +54,9 @@ class MonitorScreenState extends State<MonitorScreen> {
   final FaceMeshService _mesh = FaceMeshService();
   final DrowsinessDetector _detector = DrowsinessDetector();
   final AlertService _alert = AlertService();
+
+  // Tempat terdekat (Maps API lewat server.py): kartu rekomendasi pitstop & tombol rest area
+  final NearbyPlacesController _nearby = NearbyPlacesController();
 
   // Hasil deteksi real-time
   DetectionResult _result = DetectionResult.initial;
@@ -88,6 +92,7 @@ class MonitorScreenState extends State<MonitorScreen> {
     _cameraController?.dispose();
     _mesh.dispose();
     _alert.dispose();
+    _nearby.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -177,6 +182,9 @@ class MonitorScreenState extends State<MonitorScreen> {
       });
       _resumeTimer();
 
+      // Tempat terdekat: ikuti posisi selama sesi berjalan. Semua error ditangani di dalam
+      // controller dan tidak pernah mengganggu deteksi kantuk.
+      unawaited(_nearby.start());
     } catch (e) {
       debugPrint('Init kamera gagal: $e');
       if (mounted) {
@@ -347,6 +355,7 @@ class MonitorScreenState extends State<MonitorScreen> {
     await _cameraController?.dispose();
     _cameraController = null;
     await _alert.stop();
+    _nearby.stop();
     await WakelockPlus.disable();
 
     setState(() {
@@ -444,6 +453,9 @@ class MonitorScreenState extends State<MonitorScreen> {
     if (_isAlertShowing) return;
     _isAlertShowing = true;
 
+    // Alarm bunyi: langsung cari tempat berhenti terdekat (apa pun jenisnya) untuk kartu di dialog.
+    unawaited(_nearby.requestUrgent());
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -452,6 +464,7 @@ class MonitorScreenState extends State<MonitorScreen> {
         title: title,
         subtitle: subtitle,
         reason: reason,
+        nearby: _nearby,
         onDismiss: () async {
           await _alert.stop();
           if (resetYawnsOnDismiss) {
@@ -459,14 +472,22 @@ class MonitorScreenState extends State<MonitorScreen> {
           }
         },
         onRestArea: () async {
+          // Ambil tempat yang sedang tampil di kartu SEKARANG, sebelum dialog ditutup dan
+          // mode darurat dimatikan (kalau tidak, pilihannya bisa berubah di tengah jalan).
+          final target = _nearby.best;
           await _alert.stop();
           if (resetYawnsOnDismiss) {
             _detector.resetYawns();
           }
-          if (mounted) {
+          // Buka Google Maps (mode mobil) ke tempat berhenti terdekat dari server.
+          final opened = target != null
+              ? await _nearby.navigateTo(target)
+              : await _nearby.navigateToBest();
+          if (!opened && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Mengarahkan ke rest area terdekat...'),
+                content: Text(
+                    'Belum ada tempat berhenti yang ditemukan. Menepi di tempat yang aman ya.'),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -475,6 +496,7 @@ class MonitorScreenState extends State<MonitorScreen> {
       ),
     ).then((_) {
       _isAlertShowing = false;
+      _nearby.clearUrgent();
     });
   }
 
@@ -1150,103 +1172,9 @@ class MonitorScreenState extends State<MonitorScreen> {
   // 3. REKOMENDASI PITSTOP ASSISTANT CARD
   // ──────────────────────────────────────────────────────────────────────────
   Widget _buildPitstopAssistantCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5), Color(0xFFFFFBF8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFED7AA)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFE57A38).withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFED7AA)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.local_cafe_rounded,
-              color: Color(0xFFE57A38),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'REKOMENDASI PITSTOP',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
-                    color: Color(0xFFC25E21),
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Rest Area KM 57 Tol Japek',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                Text(
-                  '4.2 km lagi • Fasilitas Kopi & SPBU 24 Jam',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF475569),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Mengarahkan rute ke Rest Area KM 57...'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE57A38),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              elevation: 2,
-            ),
-            child: const Icon(Icons.navigation_rounded, size: 20),
-          ),
-        ],
-      ),
-    );
+    // Rekomendasi pitstop dari Maps API (desain Stitch yang sama): tombol kanan = buka
+    // Google Maps, ketuk kartu = daftar rest area / minimarket / hotel-motel / SPBU terdekat.
+    return PitstopCard(controller: _nearby);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -1553,6 +1481,9 @@ class MicrosleepAlertDialog extends StatefulWidget {
   final VoidCallback? onDismiss;
   final VoidCallback? onRestArea;
 
+  /// Sumber tempat berhenti terdekat (Maps API). `null` = kartu contoh bawaan.
+  final NearbyPlacesController? nearby;
+
   const MicrosleepAlertDialog({
     super.key,
     this.title = 'MATA TERPEJAM!\nISTIRAHAT SEKARANG',
@@ -1560,6 +1491,7 @@ class MicrosleepAlertDialog extends StatefulWidget {
     this.reason = 'Microsleep terdeteksi. Segera cari tempat aman untuk berhenti.',
     this.onDismiss,
     this.onRestArea,
+    this.nearby,
   });
 
   @override
@@ -1817,6 +1749,35 @@ class _MicrosleepAlertDialogState extends State<MicrosleepAlertDialog>
   }
 
   Widget _buildRecommendationCard() {
+    final nearby = widget.nearby;
+    if (nearby == null) {
+      return _buildRecommendationBox(
+        icon: Icons.local_cafe_rounded,
+        title: 'Rest Area KM 57 (4.2 km lagi)',
+      );
+    }
+    // Tempat berhenti terdekat dari server (mode darurat), dengan desain kartu yang sama.
+    // Navigasinya lewat tombol "ARAHKAN KE REST AREA TERDEKAT" di bawah.
+    return ListenableBuilder(
+      listenable: nearby,
+      builder: (context, _) {
+        final view = PitstopView.from(nearby, urgent: true);
+        return _buildRecommendationBox(
+          icon: view.icon,
+          title: view.title,
+          subtitle: view.subtitle,
+          busy: view.busy,
+        );
+      },
+    );
+  }
+
+  Widget _buildRecommendationBox({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    bool busy = false,
+  }) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1833,14 +1794,22 @@ class _MicrosleepAlertDialogState extends State<MicrosleepAlertDialog>
               color: const Color(0xFFE57A38).withOpacity(0.18),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.local_cafe_rounded, color: Color(0xFFE57A38), size: 20),
+            child: busy
+                ? const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFFE57A38),
+                    ),
+                  )
+                : Icon(icon, color: const Color(0xFFE57A38), size: 20),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'REKOMENDASI PITSTOP AMAN',
                   style: TextStyle(
                     fontSize: 9,
@@ -1849,15 +1818,28 @@ class _MicrosleepAlertDialogState extends State<MicrosleepAlertDialog>
                     letterSpacing: 0.6,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Rest Area KM 57 (4.2 km lagi)',
-                  style: TextStyle(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFFEAE0DD),
                   ),
                 ),
+                if (subtitle != null && subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFB8A9A2),
+                    ),
+                  ),
               ],
             ),
           ),

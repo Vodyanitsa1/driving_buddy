@@ -5,6 +5,7 @@ import '../core/app_colors.dart';
 import '../routes/app_routes.dart';
 import '../supabase_service.dart';
 import '../widgets/driving_buddy_app_bar.dart';
+import '../features/nearby_places/nearby_places.dart';
 
 // ============================================================================
 // HOME SCREEN / COCKPIT (Beranda Telemetri Amber Accent — Luxury GT)
@@ -1023,7 +1024,7 @@ class _CockpitScreenState extends State<CockpitScreen> {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Rest Area KM 57 Tol Japek',
+                  'Cari rest area terdekat',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -1031,7 +1032,7 @@ class _CockpitScreenState extends State<CockpitScreen> {
                   ),
                 ),
                 Text(
-                  '4.2 km lagi • Fasilitas Kopi & SPBU 24 Jam',
+                  'Rest area, minimarket, hotel/motel & SPBU',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
@@ -1042,14 +1043,8 @@ class _CockpitScreenState extends State<CockpitScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Membuka rute ke Rest Area KM 57...'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
+            // Daftar tempat terdekat dari Maps API (rest area, minimarket, hotel/motel, SPBU).
+            onPressed: () => showNearbyPlacesSheet(context),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE57A38),
               foregroundColor: Colors.white,
