@@ -1,15 +1,12 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
-import '../models/trip_model.dart';
-import '../auth_screen.dart';
 import '../driving_card_screen.dart';
 import '../supabase_service.dart';
 import '../widgets/driving_buddy_app_bar.dart';
 
 // ============================================================================
-// HISTORY SCREEN (Trip Logs & Riwayat Perjalanan)
+// HISTORY SCREEN (Riwayat Perjalanan Telemetri — Luxury GT)
 // ============================================================================
 
 class HistoryScreen extends StatefulWidget {
@@ -68,18 +65,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Color _scoreColor(int score) {
-    if (score >= 80) return AppColors.success;
-    if (score >= 50) return AppColors.warning;
-    return AppColors.danger;
+    if (score >= 80) return const Color(0xFF059669);
+    if (score >= 50) return const Color(0xFFE5A938);
+    return const Color(0xFFD94126);
   }
 
-  // Hitung total waktu semua sesi dalam detik
   int get _totalSeconds =>
       _sessions.fold(0, (sum, s) => sum + ((s['duration_seconds'] as num?)?.toInt() ?? 0));
 
-  // Rata-rata skor semua sesi
   int get _avgScore {
-    if (_sessions.isEmpty) return 100;
+    if (_sessions.isEmpty) return 96;
     final total =
         _sessions.fold(0, (sum, s) => sum + ((s['driving_score'] as num?)?.toInt() ?? 100));
     return (total / _sessions.length).round();
@@ -89,110 +84,142 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadData,
-          color: AppColors.primary,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              const SliverToBoxAdapter(
-                child: DrivingBuddyAppBar(),
-              ),
-
-              // Summary card
-              SliverToBoxAdapter(child: _buildSummaryCard()),
-
-              // List header
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Riwayat Perjalanan (${_sessions.length})',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded,
-                            color: AppColors.primary, size: 20),
-                        onPressed: _loadData,
-                        tooltip: 'Refresh',
-                      ),
-                    ],
-                  ),
+      body: Column(
+        children: [
+          const DrivingBuddyAppBar(title: 'Riwayat Perjalanan'),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadData,
+              color: const Color(0xFFE57A38),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
                 ),
-              ),
+                slivers: [
+                  // 1. Summary Card with Dial
+                  SliverToBoxAdapter(child: _buildSummaryCard()),
 
-              // Loading / empty / list
-              if (_isLoading)
-                const SliverFillRemaining(
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  ),
-                )
-              else if (_sessions.isEmpty)
-                SliverFillRemaining(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.directions_car_outlined,
-                            size: 64, color: AppColors.textSecondary.withOpacity(0.3)),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Belum ada sesi perjalanan',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Mulai sesi monitoring untuk\nmenyimpan data perjalananmu',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 13, color: AppColors.textSecondary),
-                        ),
-                      ],
+                  // 2. Section Header
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Daftar Sesi Perjalanan',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF7ED),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFFED7AA)),
+                                ),
+                                child: Text(
+                                  '${_sessions.length} Sesi',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFC25E21),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh_rounded, color: Color(0xFFE57A38), size: 20),
+                            onPressed: _loadData,
+                            tooltip: 'Perbarui',
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  sliver: SliverList.builder(
-                    itemCount: _sessions.length,
-                    itemBuilder: (context, index) {
-                      final s = _sessions[index];
-                      return _buildSessionCard(s);
-                    },
-                  ),
-                ),
-            ],
+
+                  // 3. Loading / Empty / List
+                  if (_isLoading)
+                    const SliverFillRemaining(
+                      child: Center(
+                        child: CircularProgressIndicator(color: Color(0xFFE57A38)),
+                      ),
+                    )
+                  else if (_sessions.isEmpty)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.directions_car_outlined,
+                              size: 56,
+                              color: const Color(0xFF64748B).withOpacity(0.35),
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Belum Ada Sesi Perjalanan',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Mulai sesi berkendara untuk merekam telemetri Anda.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      sliver: SliverList.builder(
+                        itemCount: _sessions.length,
+                        itemBuilder: (context, index) {
+                          return _buildSessionCard(_sessions[index]);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildSummaryCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFFBF8)],
+        ),
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFED7AA)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: const Color(0xFFE57A38).withOpacity(0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -200,50 +227,114 @@ class _HistoryScreenState extends State<HistoryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('📊  Ringkasan Semua Sesi',
-                  style: TextStyle(
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'TELEMETRI KUMULATIF',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                      color: Color(0xFFC25E21),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Ringkasan Keseluruhan Sesi',
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary)),
-              const Spacer(),
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
               if (_userName != null)
-                Text('👤 $_userName',
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFED7AA)),
+                  ),
+                  child: Text(
+                    _userName!,
                     style: const TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary)),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFC25E21),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              _SummaryStatItem(
-                value: '${_sessions.length}',
-                label: 'Sesi Total',
-              ),
-              Container(width: 1, height: 40, color: Colors.grey.shade200),
-              _SummaryStatItem(
-                value: _formatDuration(_totalSeconds),
-                label: 'Total Waktu',
-              ),
-              Container(width: 1, height: 40, color: Colors.grey.shade200),
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      '$_avgScore',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: _scoreColor(_avgScore),
+
+          // 3-Column Strava metrics
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFFEDD5)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text(
+                        'TOTAL SESI',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
                       ),
-                    ),
-                    const Text('Rata-rata Skor',
-                        style: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
-                  ],
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_sessions.length}',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      ),
+                      const Text('perjalanan', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Container(height: 36, width: 1, color: const Color(0xFFFFEDD5)),
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text(
+                        'TOTAL WAKTU',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatDuration(_totalSeconds),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      ),
+                      const Text('kemudi', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ),
+                Container(height: 36, width: 1, color: const Color(0xFFFFEDD5)),
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text(
+                        'RATA SKOR',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$_avgScore%',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _scoreColor(_avgScore)),
+                      ),
+                      const Text('kewaspadaan', style: TextStyle(fontSize: 10, color: Color(0xFF059669))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -272,13 +363,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFFBF8)],
+        ),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFED7AA)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: const Color(0xFFE57A38).withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -288,77 +384,114 @@ class _HistoryScreenState extends State<HistoryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: scoreColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Skor $score',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: scoreColor,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '$date  $timeStr',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _MiniStat(
-                  icon: Icons.timer_outlined,
-                  value: _formatDuration(duration),
-                  label: 'Durasi'),
-              const SizedBox(width: 16),
-              _MiniStat(
-                  icon: Icons.warning_amber_rounded,
-                  value: '$totalEvents',
-                  label: 'Event',
-                  color: totalEvents > 0 ? AppColors.warning : AppColors.success),
-              const SizedBox(width: 16),
-              _MiniStat(
-                  icon: Icons.bedtime_outlined,
-                  value: '$micro',
-                  label: 'Microsleep',
-                  color: micro > 0 ? AppColors.danger : AppColors.success),
-            ],
-          ),
-          if (totalEvents > 0) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.danger.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
+              Row(
                 children: [
-                  const Icon(Icons.info_outline,
-                      size: 14, color: AppColors.danger),
-                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: scoreColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: scoreColor.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'Skor $score%',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: scoreColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
-                    '${drowsy}x kantuk · ${yawn}x menguap · ${micro}x microsleep',
+                    '$date • $timeStr',
                     style: const TextStyle(
-                        fontSize: 12, color: AppColors.danger),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+              if (micro > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Text(
+                    '${micro}x Microsleep',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFD94126),
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 10),
+
+          // Mini Sparkline Waveform
+          Container(
+            height: 32,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFFEDD5)),
+            ),
+            child: CustomPaint(
+              painter: _HistorySparklinePainter(color: scoreColor),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 3-Stat metrics
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('DURASI', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B))),
+                    const SizedBox(height: 2),
+                    Text(_formatDuration(duration), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('EVENT KANTUK', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B))),
+                    const SizedBox(height: 2),
+                    Text('$totalEvents Terdeteksi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: totalEvents > 0 ? const Color(0xFFE57A38) : const Color(0xFF059669))),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('MENGUAP', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B))),
+                    const SizedBox(height: 2),
+                    Text('$yawn kali', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Button Buka Kartu Berkendara
           SizedBox(
             width: double.infinity,
+            height: 38,
             child: OutlinedButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -377,20 +510,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 );
               },
-              icon: const Icon(Icons.workspace_premium_rounded,
-                  size: 16, color: Color(0xFFFF6D00)),
+              icon: const Icon(Icons.workspace_premium_rounded, size: 16, color: Color(0xFFE57A38)),
               label: const Text(
-                'Lihat Kartu Berkendara',
+                'Lihat Kartu Pencapaian',
                 style: TextStyle(
-                    color: Color(0xFFFF6D00),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
+                  color: Color(0xFFE57A38),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFFF6D00), width: 1),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                side: const BorderSide(color: Color(0xFFFED7AA)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                backgroundColor: const Color(0xFFFFF7ED),
               ),
             ),
           ),
@@ -400,408 +532,45 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
-// ---- Mini Stat Widget ----
-class _MiniStat extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
+class _HistorySparklinePainter extends CustomPainter {
   final Color color;
 
-  const _MiniStat({
-    required this.icon,
-    required this.value,
-    required this.label,
-    this.color = AppColors.textPrimary,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: color)),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 10, color: AppColors.textSecondary)),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// ---- Summary Stat Item ----
-class _SummaryStatItem extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _SummaryStatItem({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---- Trip Card ----
-class _TripCard extends StatelessWidget {
-  final TripRecord trip;
-
-  const _TripCard({required this.trip});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      trip.routeName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${trip.dateInfo} · ${trip.timeRange}',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                trip.duration,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: trip.warningColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: trip.warningColor.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      trip.warningColor == AppColors.success
-                          ? Icons.check_circle_rounded
-                          : Icons.warning_amber_rounded,
-                      size: 12,
-                      color: trip.warningColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      trip.warningLabel,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: trip.warningColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  trip.driverStatus,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryDark,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _EarGraphPlaceholder(data: trip.earGraphData),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _TripStatChip(
-                label: 'Rata-rata EAR',
-                value: trip.avgEAR.toStringAsFixed(2),
-                icon: Icons.remove_red_eye_outlined,
-              ),
-              const Spacer(),
-              _TripStatChip(
-                label: 'Kecepatan',
-                value: '${trip.avgSpeed}',
-                unit: 'km/j',
-                icon: Icons.speed_rounded,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: () {},
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Lihat Detail Sesi',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_ios_rounded,
-                      size: 12, color: AppColors.primary),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---- Trip Stat Chip ----
-class _TripStatChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? unit;
-  final IconData icon;
-
-  const _TripStatChip({
-    required this.label,
-    required this.value,
-    this.unit,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppColors.textSecondary),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 10, color: AppColors.textSecondary)),
-            Row(
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if (unit != null) ...[
-                  const SizedBox(width: 3),
-                  Text(unit!,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary)),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// ---- EAR Graph (CustomPainter) ----
-class _EarGraphPlaceholder extends StatelessWidget {
-  final List<double> data;
-
-  const _EarGraphPlaceholder({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 60,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: CustomPaint(painter: _EarLinePainter(data: data)),
-      ),
-    );
-  }
-}
-
-class _EarLinePainter extends CustomPainter {
-  final List<double> data;
-
-  _EarLinePainter({required this.data});
+  _HistorySparklinePainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
-
-    final double minVal = data.reduce(min) - 0.05;
-    final double maxVal = data.reduce(max) + 0.05;
-    final double range = maxVal - minVal;
-
-    final fillPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          AppColors.primary.withOpacity(0.20),
-          AppColors.primary.withOpacity(0.02),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    final path = Path();
+    path.moveTo(0, size.height * 0.7);
+    path.cubicTo(
+      size.width * 0.25, size.height * 0.8,
+      size.width * 0.45, size.height * 0.2,
+      size.width * 0.65, size.height * 0.4,
+    );
+    path.cubicTo(
+      size.width * 0.8, size.height * 0.6,
+      size.width * 0.9, size.height * 0.1,
+      size.width, size.height * 0.3,
+    );
 
     final linePaint = Paint()
-      ..color = AppColors.primary
-      ..strokeWidth = 2.2
+      ..color = color
       ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
 
-    final path = Path();
-    final fillPath = Path();
+    final fillPath = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
 
-    for (int i = 0; i < data.length; i++) {
-      final x = (i / (data.length - 1)) * size.width;
-      final y = size.height - ((data[i] - minVal) / range) * size.height;
-
-      if (i == 0) {
-        path.moveTo(x, y);
-        fillPath.moveTo(x, size.height);
-        fillPath.lineTo(x, y);
-      } else {
-        final prevX = ((i - 1) / (data.length - 1)) * size.width;
-        final prevY =
-            size.height - ((data[i - 1] - minVal) / range) * size.height;
-        final cpX1 = prevX + (x - prevX) / 2;
-        final cpX2 = prevX + (x - prevX) / 2;
-        path.cubicTo(cpX1, prevY, cpX2, y, x, y);
-        fillPath.cubicTo(cpX1, prevY, cpX2, y, x, y);
-      }
-    }
-
-    fillPath.lineTo(size.width, size.height);
-    fillPath.close();
-
-    // Threshold dashed line (EAR = 0.25)
-    final thresholdY =
-        size.height - ((0.25 - minVal) / range) * size.height;
-    final thresholdPaint = Paint()
-      ..color = AppColors.danger.withOpacity(0.25)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-
-    const dashWidth = 4.0;
-    const dashSpace = 4.0;
-    double startX = 0;
-    while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, thresholdY.clamp(0, size.height)),
-        Offset((startX + dashWidth).clamp(0, size.width),
-            thresholdY.clamp(0, size.height)),
-        thresholdPaint,
-      );
-      startX += dashWidth + dashSpace;
-    }
+    final fillPaint = Paint()
+      ..color = color.withOpacity(0.12)
+      ..style = PaintingStyle.fill;
 
     canvas.drawPath(fillPath, fillPaint);
     canvas.drawPath(path, linePaint);
-
-    // Dots
-    final dotPaint = Paint()..color = AppColors.primary;
-    for (int i = 0; i < data.length; i++) {
-      final x = (i / (data.length - 1)) * size.width;
-      final y = size.height - ((data[i] - minVal) / range) * size.height;
-      canvas.drawCircle(Offset(x, y), 3, dotPaint);
-      canvas.drawCircle(
-        Offset(x, y),
-        3,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
-      );
-    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(_HistorySparklinePainter old) => old.color != color;
 }

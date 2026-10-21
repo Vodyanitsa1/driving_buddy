@@ -8,9 +8,10 @@ import '../models/account_config.dart';
 import '../services/alert_config.dart';
 import '../supabase_service.dart';
 import '../routes/app_routes.dart';
+import '../widgets/driving_buddy_app_bar.dart';
 
 // ============================================================================
-// SETTINGS SCREEN (Akun, Audio Alarm & Pengaturan Aplikasi)
+// SETTINGS SCREEN (Akun, Audio Alarm & Pengaturan — Luxury GT)
 // ============================================================================
 
 typedef SettingsScreen = AccountSettingsScreen;
@@ -35,7 +36,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final AudioPlayer _previewPlayer = AudioPlayer();
   bool _isPlayingPreview = false;
 
-  AlertImageMode _selectedImageMode = AlertImageMode.defaultMeme;
+  AlertImageMode _selectedImageMode = AlertImageMode.none;
   String? _customImagePath;
 
   @override
@@ -80,7 +81,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       } else if (_selectedAudioType == AlertAudioType.buzzer) {
         await _previewPlayer.play(AssetSource('sounds/buzzer.wav'));
       } else {
-        await _previewPlayer.play(AssetSource('sounds/alarm.mp3'));
+        try {
+          await _previewPlayer.play(AssetSource('audio/alarm.mp3'));
+        } catch (_) {
+          await _previewPlayer.play(AssetSource('sounds/alarm.mp3'));
+        }
       }
 
       // Otomatis stop setelah 4 detik
@@ -141,54 +146,52 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.audiotrack_rounded, color: AppColors.primary),
-                const SizedBox(width: 10),
-                const Text(
+                Icon(Icons.audiotrack_rounded, color: Color(0xFFE57A38)),
+                SizedBox(width: 10),
+                Text(
                   'Pilih Audio Kustom dari HP',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.pop(ctx),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             if (foundAudios.isNotEmpty) ...[
               const Text(
-                'File Audio Ditemukan di Folder HP:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                'File Audio Terdeteksi di Memori HP:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 8),
-              Container(
+              ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 180),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade200),
-                  borderRadius: BorderRadius.circular(12),
-                ),
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: foundAudios.length,
-                  itemBuilder: (_, idx) {
-                    final f = foundAudios[idx];
+                  itemBuilder: (context, i) {
+                    final f = foundAudios[i];
                     final fname = f.path.split(Platform.pathSeparator).last;
                     return ListTile(
                       dense: true,
+                      contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.music_note_rounded,
-                          color: AppColors.primary, size: 20),
-                      title: Text(fname,
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w600)),
+                          color: Color(0xFFE57A38), size: 20),
+                      title: Text(
+                        fname,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: const Icon(Icons.check_circle_outline_rounded,
+                          size: 18),
                       onTap: () async {
+                        final messenger = ScaffoldMessenger.of(context);
                         Navigator.pop(ctx);
                         if (_isPlayingPreview) await _previewPlayer.stop();
                         await AlertConfig.setCustomAudio(f.path, fname);
                         await _loadAlertSettings();
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             SnackBar(
                               content:
                                   Text('✅ Suara alarm berhasil diganti: $fname'),
@@ -206,7 +209,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             ],
             const Text(
               'Atau Masukkan Path File Audio:',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -224,6 +227,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
+              height: 48,
               child: ElevatedButton(
                 onPressed: () async {
                   final text = controller.text.trim();
@@ -257,6 +261,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     }
                   }
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE57A38),
+                ),
                 child: const Text('Terapkan File Audio'),
               ),
             ),
@@ -303,20 +310,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Gambar alert dihapus (Mode Hanya Teks & Ikon)'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Future<void> _restoreDefaultMeme() async {
-    await AlertConfig.setImageMode(AlertImageMode.defaultMeme);
-    await _loadAlertSettings();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Meme tidur bawaan diaktifkan kembali'),
+          content: Text('Gambar kustom dihapus (Kembali ke Ikon Standar)'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -405,216 +399,236 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'Akun & Pengaturan',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: Column(
         children: [
-          Center(
-            child: Column(
+          DrivingBuddyAppBar(
+            title: 'Pengaturan',
+            showBackButton: true,
+            showProfileButton: false,
+            onBack: () => Navigator.pop(context),
+          ),
+          Expanded(
+            child: ListView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.accent],
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE57A38), Color(0xFFC25E21)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE57A38).withOpacity(0.35),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            _nameController.text.isNotEmpty
+                                ? _nameController.text[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _isLoggedIn
+                            ? (_nameController.text.isNotEmpty
+                                ? _nameController.text
+                                : 'Pengemudi')
+                            : 'Tamu / Offline',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _isLoggedIn
+                              ? const Color(0xFFECFDF5)
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _isLoggedIn
+                                ? const Color(0xFFA7F3D0)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Text(
+                          _isLoggedIn ? '● Supabase Terhubung' : '○ Mode Tamu (Offline)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _isLoggedIn
+                                ? const Color(0xFF059669)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Text(
-                      _nameController.text.isNotEmpty
-                          ? _nameController.text[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                ),
+                const SizedBox(height: 24),
+
+                // AI Info Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF14100E), Color(0xFF1F1B18)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF564339)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.psychology_rounded,
+                          color: Color(0xFFE57A38), size: 22),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'DrivingBuddy berjalan sepenuhnya On-Device (Google ML Kit Face Mesh). '
+                          'Deteksi wajah & kantuk tidak butuh internet.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFEAE0DD),
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Nama Pengemudi',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _nameController,
+                  hint: 'Masukkan nama kamu',
+                  icon: Icons.person_rounded,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Email',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _emailController,
+                  hint: 'email@contoh.com',
+                  icon: Icons.email_rounded,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _saveProfile,
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.save_rounded, size: 18),
+                    label: Text(_isSaving ? 'Menyimpan...' : 'Simpan Profil'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE57A38),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                const Divider(color: Color(0xFFFED7AA)),
+                const SizedBox(height: 20),
+
+                // Kustomisasi Alert & Alarm
+                _buildAlertSettingsSection(),
+                const SizedBox(height: 28),
+                const Divider(color: Color(0xFFFED7AA)),
+                const SizedBox(height: 20),
+
+                const Text(
+                  'Informasi Sistem',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  _isLoggedIn
-                      ? (_nameController.text.isNotEmpty
-                          ? _nameController.text
-                          : 'Pengemudi')
-                      : 'Tamu / Offline',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _isLoggedIn
-                        ? AppColors.success.withOpacity(0.1)
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _isLoggedIn ? '● Supabase Terhubung' : '○ Mode Tamu (Offline)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _isLoggedIn
-                          ? AppColors.success
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A2E),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.psychology_rounded,
-                    color: AppColors.accent, size: 22),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'DrivingBuddy berjalan sepenuhnya On-Device (Google ML Kit Face Mesh). '
-                    'Deteksi wajah & kantuk tidak butuh internet.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.85),
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Nama Pengemudi',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _nameController,
-            hint: 'Masukkan nama kamu',
-            icon: Icons.person_rounded,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Email',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _emailController,
-            hint: 'email@contoh.com',
-            icon: Icons.email_rounded,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isSaving ? null : _saveProfile,
-              icon: _isSaving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+                _buildInfoRow(Icons.security_rounded, 'Privasi',
+                    'Kamera diproses lokal 100%, frame video tidak dikirim'),
+                const SizedBox(height: 8),
+                _buildInfoRow(Icons.info_outline_rounded, 'Versi',
+                    'DrivingBuddy v2.0 — Luxury GT Telemetry'),
+                const SizedBox(height: 24),
+                if (_isLoggedIn) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _signOut,
+                      icon: const Icon(Icons.logout_rounded,
+                          size: 18, color: Color(0xFFD94126)),
+                      label: const Text(
+                        'Keluar dari Akun',
+                        style: TextStyle(color: Color(0xFFD94126), fontWeight: FontWeight.bold),
                       ),
-                    )
-                  : const Icon(Icons.save_rounded, size: 18),
-              label: Text(_isSaving ? 'Menyimpan...' : 'Simpan Profil'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFD94126)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 28),
-          const Divider(),
-          const SizedBox(height: 20),
-          _buildAlertSettingsSection(),
-          const SizedBox(height: 28),
-          const Divider(),
-          const SizedBox(height: 20),
-          const Text(
-            'Informasi Sistem',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildInfoRow(Icons.memory_rounded, 'AI Engine',
-              'Google ML Kit Face Mesh 468 (On-Device Offline)'),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.cloud_done_rounded, 'Database Cloud',
-              'Supabase PostgreSQL (Sinkronisasi Riwayat)'),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.security_rounded, 'Privasi',
-              'Kamera diproses lokal 100%, frame video tidak dikirim'),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.info_outline_rounded, 'Versi',
-              'DrivingBuddy v1.0.0 — Capstone UIUX'),
-          const SizedBox(height: 24),
-          if (_isLoggedIn) ...[
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _signOut,
-                icon: const Icon(Icons.logout_rounded,
-                    size: 18, color: AppColors.danger),
-                label: const Text(
-                  'Keluar dari Akun',
-                  style: TextStyle(color: AppColors.danger),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.danger),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-          ],
         ],
       ),
     );
@@ -630,10 +644,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: const Color(0xFFFED7AA)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -645,7 +659,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         style: const TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
+          color: Color(0xFF0F172A),
         ),
         decoration: InputDecoration(
           hintText: hint,
@@ -653,7 +667,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             color: Colors.grey.shade400,
             fontWeight: FontWeight.w400,
           ),
-          prefixIcon: Icon(icon, color: AppColors.primary),
+          prefixIcon: Icon(icon, color: const Color(0xFFE57A38)),
           border: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -669,9 +683,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFEDD5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),
@@ -679,7 +694,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.primary),
+          Icon(icon, size: 18, color: const Color(0xFFE57A38)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -688,9 +703,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -699,7 +714,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
               ],
@@ -717,15 +732,15 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         const Text(
           'Kustomisasi Peringatan (Alert & Alarm)',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            color: Color(0xFF0F172A),
           ),
         ),
         const SizedBox(height: 4),
         const Text(
-          'Atur nada suara alarm dan gambar yang ditampilkan saat bahaya',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          'Atur nada suara alarm bawaan dan gambar yang ditampilkan saat bahaya',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
         ),
         const SizedBox(height: 14),
 
@@ -733,12 +748,16 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFFFFF), Color(0xFFFFFBF8)],
+            ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: const Color(0xFFFED7AA)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: const Color(0xFFE57A38).withOpacity(0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -753,11 +772,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.12),
+                      color: const Color(0xFFFFF7ED),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFED7AA)),
                     ),
                     child: const Icon(Icons.volume_up_rounded,
-                        color: AppColors.primary, size: 20),
+                        color: Color(0xFFE57A38), size: 20),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
@@ -768,14 +788,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           'Suara Alarm Keselamatan',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
                         Text(
-                          'Diputar saat kantuk atau microsleep terdeteksi',
+                          'Bawaan: Sirene Darurat (bisa diubah sesuai selera)',
                           style: TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary),
+                              fontSize: 11, color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
@@ -785,7 +805,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               const SizedBox(height: 14),
               _buildAudioOptionTile(
                 title: 'Sirene Darurat (Bawaan)',
-                subtitle: 'Suara sirene alarm standar',
+                subtitle: 'Suara sirene alarm standar darurat',
                 isSelected: _selectedAudioType == AlertAudioType.defaultSiren,
                 onTap: () => _selectAudioPreset(AlertAudioType.defaultSiren),
               ),
@@ -827,36 +847,36 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                             : Icons.play_circle_fill_rounded,
                         size: 18,
                         color: _isPlayingPreview
-                            ? AppColors.danger
-                            : AppColors.primary,
+                            ? const Color(0xFFD94126)
+                            : const Color(0xFFE57A38),
                       ),
                       label: Text(
                         _isPlayingPreview ? 'Hentikan Contoh' : 'Tes Bunyi Alarm',
                         style: TextStyle(
                           color: _isPlayingPreview
-                              ? AppColors.danger
-                              : AppColors.primary,
-                          fontWeight: FontWeight.w700,
+                              ? const Color(0xFFD94126)
+                              : const Color(0xFFE57A38),
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
                           color: _isPlayingPreview
-                              ? AppColors.danger
-                              : AppColors.primary,
+                              ? const Color(0xFFD94126)
+                              : const Color(0xFFE57A38),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                     ),
                   ),
-                  if (_selectedAudioType == AlertAudioType.customFile) ...[
+                  if (_selectedAudioType != AlertAudioType.defaultSiren) ...[
                     const SizedBox(width: 8),
                     IconButton(
-                      tooltip: 'Kembalikan ke suara bawaan',
+                      tooltip: 'Kembalikan ke sirene bawaan',
                       onPressed: () =>
                           _selectAudioPreset(AlertAudioType.defaultSiren),
                       icon: const Icon(Icons.refresh_rounded,
-                          color: AppColors.textSecondary),
+                          color: Color(0xFFE57A38)),
                     ),
                   ],
                 ],
@@ -867,16 +887,20 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
         const SizedBox(height: 16),
 
-        // ── 2. GAMBAR ALERT CARD ──
+       
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFFFFF), Color(0xFFFFFBF8)],
+            ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: const Color(0xFFFED7AA)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: const Color(0xFFE57A38).withOpacity(0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -891,11 +915,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.12),
+                      color: const Color(0xFFFFF7ED),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFED7AA)),
                     ),
                     child: const Icon(Icons.image_rounded,
-                        color: AppColors.accent, size: 20),
+                        color: Color(0xFFE57A38), size: 20),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
@@ -906,14 +931,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           'Gambar Peringatan Visual',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
                         Text(
-                          'Gambar di layar modal saat alarm berbunyi',
+                          'Bawaan: Ikon Bahaya Standar',
                           style: TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary),
+                              fontSize: 11, color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
@@ -930,7 +955,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF9FAFB),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(color: const Color(0xFFFFEDD5)),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: _buildImagePreviewWidget(),
@@ -947,40 +972,28 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       onPressed: _pickCustomImage,
                       icon: const Icon(Icons.photo_library_rounded, size: 16),
                       label: const Text(
-                        'Ganti Gambar',
+                        'Pilih Gambar Kustom',
                         style:
                             TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                       ),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 11),
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: const Color(0xFFE57A38),
+                        foregroundColor: Colors.white,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (_selectedImageMode != AlertImageMode.defaultMeme) ...[
-                    OutlinedButton.icon(
-                      onPressed: _restoreDefaultMeme,
-                      icon: const Icon(Icons.restore_rounded, size: 16),
-                      label:
-                          const Text('Meme Bawaan', style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 11),
-                      ),
-                    ),
+                  if (_selectedImageMode == AlertImageMode.custom) ...[
                     const SizedBox(width: 8),
-                  ],
-                  if (_selectedImageMode != AlertImageMode.none) ...[
                     OutlinedButton.icon(
                       onPressed: _removeAlertImage,
                       icon: const Icon(Icons.delete_outline_rounded,
-                          size: 16, color: AppColors.danger),
+                          size: 16, color: Color(0xFFD94126)),
                       label: const Text('Hapus',
                           style: TextStyle(
-                              fontSize: 12, color: AppColors.danger)),
+                              fontSize: 12, color: Color(0xFFD94126))),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.danger),
+                        side: const BorderSide(color: Color(0xFFD94126)),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 11),
                       ),
@@ -996,27 +1009,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   Widget _buildImagePreviewWidget() {
-    if (_selectedImageMode == AlertImageMode.none) {
-      return const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.hide_image_rounded, size: 36, color: Color(0xFF9CA3AF)),
-          SizedBox(height: 6),
-          Text(
-            'Gambar Peringatan Dinonaktifkan',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          Text(
-            'Hanya menampilkan teks peringatan & tombol istirahat',
-            style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
-          ),
-        ],
-      );
-    } else if (_selectedImageMode == AlertImageMode.custom &&
+    if (_selectedImageMode == AlertImageMode.custom &&
         _customImagePath != null &&
         File(_customImagePath!).existsSync()) {
       return Stack(
@@ -1043,32 +1036,28 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
         ],
       );
-    } else {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset('assets/images/meme_tidur.png', fit: BoxFit.cover),
-          Positioned(
-            bottom: 6,
-            left: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.65),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Meme Tidur Bawaan',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ],
-      );
     }
+
+    // Default: Clean Safety Icon (No meme)
+    return const Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.shield_outlined, size: 40, color: Color(0xFFE57A38)),
+        SizedBox(height: 6),
+        Text(
+          'Ikon Peringatan Standar Aktif',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        Text(
+          'Menampilkan animasi bahaya darurat',
+          style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+        ),
+      ],
+    );
   }
 
   Widget _buildAudioOptionTile({
@@ -1078,28 +1067,26 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     required VoidCallback onTap,
     IconData? trailingIcon,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withOpacity(0.08)
-              : Colors.transparent,
+          color: isSelected ? const Color(0xFFFFF7ED) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? AppColors.primary.withOpacity(0.4)
-                : Colors.grey.shade200,
+            color: isSelected ? const Color(0xFFFED7AA) : Colors.transparent,
           ),
         ),
         child: Row(
           children: [
             Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected ? AppColors.primary : const Color(0xFF9CA3AF),
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
               size: 18,
+              color: isSelected ? const Color(0xFFE57A38) : const Color(0xFF94A3B8),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1111,28 +1098,25 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w600,
-                      color: isSelected
-                          ? AppColors.primaryDark
-                          : AppColors.textPrimary,
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color:
+                          isSelected ? const Color(0xFF0F172A) : const Color(0xFF475569),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: isSelected
+                          ? const Color(0xFFC25E21)
+                          : const Color(0xFF94A3B8),
+                    ),
                   ),
                 ],
               ),
             ),
-            if (trailingIcon != null) ...[
-              const SizedBox(width: 8),
-              Icon(trailingIcon, size: 18, color: AppColors.primary),
-            ],
+            if (trailingIcon != null)
+              Icon(trailingIcon, size: 18, color: const Color(0xFFE57A38)),
           ],
         ),
       ),

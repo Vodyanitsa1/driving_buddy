@@ -47,7 +47,11 @@ class AlertService {
         await _player.play(AssetSource('sounds/buzzer.wav'));
         return;
       }
-      await _player.play(AssetSource('sounds/alarm.mp3'));
+      try {
+        await _player.play(AssetSource('audio/alarm.mp3'));
+      } catch (_) {
+        await _player.play(AssetSource('sounds/alarm.mp3'));
+      }
     }
   }
 

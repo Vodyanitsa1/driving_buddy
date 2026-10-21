@@ -1,102 +1,40 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
-import 'main.dart';
+import 'screens/main_shell.dart';
 
-// ─────────────────────────────────────────────────────
-//  DESIGN TOKENS — Auth Screen
-// ─────────────────────────────────────────────────────
-class _A {
-  static const bg       = Color(0xFF080C14);
-  static const surface  = Color(0xFF111827);
-  static const card     = Color(0xFF1A2235);
-  static const orange   = Color(0xFFFF5722);
-  static const orangeL  = Color(0xFFFF8A65);
-  static const white    = Colors.white;
-  static const grey     = Color(0xFF6B7280);
-  static const greyL    = Color(0xFF9CA3AF);
-  static const border   = Color(0xFF1F2D45);
-  static const danger   = Color(0xFFEF4444);
-  static const success  = Color(0xFF10B981);
-}
+// ============================================================================
+// AUTH SCREEN (Login & Registrasi — Luxury GT Obsidian Telemetry)
+// ============================================================================
 
-// ─────────────────────────────────────────────────────
-//  ANIMATED BACKGROUND PAINTER
-// ─────────────────────────────────────────────────────
-class _BgPainter extends CustomPainter {
-  final double t; // animation 0–1
-  _BgPainter(this.t);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Subtle grid lines
-    final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.025)
-      ..strokeWidth = 0.5;
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    // Floating glow orbs
-    final orb1 = Paint()
-      ..color = _A.orange.withOpacity(0.07)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 80);
-    final orb2 = Paint()
-      ..color = const Color(0xFF3B82F6).withOpacity(0.05)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 100);
-
-    final ox1 = size.width * 0.8 + math.sin(t * 2 * math.pi) * 20;
-    final oy1 = size.height * 0.15 + math.cos(t * 2 * math.pi) * 15;
-    canvas.drawCircle(Offset(ox1, oy1), 160, orb1);
-
-    final ox2 = size.width * 0.1 + math.cos(t * 2 * math.pi) * 15;
-    final oy2 = size.height * 0.75 + math.sin(t * 2 * math.pi) * 20;
-    canvas.drawCircle(Offset(ox2, oy2), 140, orb2);
-  }
-
-  @override
-  bool shouldRepaint(_BgPainter old) => old.t != t;
-}
-
-// ─────────────────────────────────────────────────────
-//  AUTH SCREEN — Single screen with Login / Register tabs
-// ─────────────────────────────────────────────────────
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
-  // Tab controller
   late final TabController _tab;
 
-  // Bg animation
-  late final AnimationController _bgCtrl;
-  late final Animation<double> _bgAnim;
-
-  // Slide-in animation
+  // Slide animation
   late final AnimationController _slideCtrl;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
 
   // Login fields
-  final _loginEmail    = TextEditingController();
+  final _loginEmail = TextEditingController();
   final _loginPassword = TextEditingController();
   bool _loginLoading = false;
   String? _loginError;
   bool _loginObscure = true;
 
   // Register fields
-  final _regName     = TextEditingController();
-  final _regEmail    = TextEditingController();
+  final _regName = TextEditingController();
+  final _regEmail = TextEditingController();
   final _regPassword = TextEditingController();
-  final _regConfirm  = TextEditingController();
+  final _regConfirm = TextEditingController();
   bool _regLoading = false;
   String? _regError;
   String? _regSuccess;
@@ -107,15 +45,12 @@ class _LoginScreenState extends State<LoginScreen>
     super.initState();
     _tab = TabController(length: 2, vsync: this);
 
-    _bgCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 8))
-      ..repeat();
-    _bgAnim = Tween(begin: 0.0, end: 1.0).animate(_bgCtrl);
-
     _slideCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 700));
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _fadeAnim = CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut);
-    _slideAnim = Tween(begin: const Offset(0, 0.06), end: Offset.zero)
+    _slideAnim = Tween(begin: const Offset(0, 0.05), end: Offset.zero)
         .animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut));
     _slideCtrl.forward();
   }
@@ -123,7 +58,6 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _tab.dispose();
-    _bgCtrl.dispose();
     _slideCtrl.dispose();
     _loginEmail.dispose();
     _loginPassword.dispose();
@@ -136,18 +70,24 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ── login ───────────────────────────────
   Future<void> _doLogin() async {
-    setState(() { _loginLoading = true; _loginError = null; });
+    setState(() {
+      _loginLoading = true;
+      _loginError = null;
+    });
     try {
       await AuthService.login(
-          email: _loginEmail.text.trim(), password: _loginPassword.text);
+        email: _loginEmail.text.trim(),
+        password: _loginPassword.text,
+      );
       if (mounted) {
         Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainShell()));
+          MaterialPageRoute(builder: (_) => const MainShell()),
+        );
       }
     } on AuthException catch (e) {
       setState(() => _loginError = _xlErr(e.message));
     } catch (_) {
-      setState(() => _loginError = 'Terjadi kesalahan. Coba lagi.');
+      setState(() => _loginError = 'Terjadi kesalahan saat masuk. Coba lagi.');
     } finally {
       if (mounted) setState(() => _loginLoading = false);
     }
@@ -155,467 +95,511 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ── register ────────────────────────────
   Future<void> _doRegister() async {
-    if (_regName.text.trim().isEmpty)
+    if (_regName.text.trim().isEmpty) {
       return setState(() => _regError = 'Nama tidak boleh kosong.');
-    if (_regPassword.text != _regConfirm.text)
-      return setState(() => _regError = 'Password tidak cocok.');
-    setState(() { _regLoading = true; _regError = null; _regSuccess = null; });
+    }
+    if (_regPassword.text != _regConfirm.text) {
+      return setState(() => _regError = 'Konfirmasi password tidak cocok.');
+    }
+    setState(() {
+      _regLoading = true;
+      _regError = null;
+      _regSuccess = null;
+    });
     try {
       await AuthService.register(
-          email: _regEmail.text.trim(),
-          password: _regPassword.text,
-          fullName: _regName.text.trim());
+        email: _regEmail.text.trim(),
+        password: _regPassword.text,
+        fullName: _regName.text.trim(),
+      );
       setState(() => _regSuccess =
-          'Akun berhasil! Cek email kamu untuk konfirmasi, lalu login.');
+          'Akun berhasil dibuat! Silakan cek email kamu untuk konfirmasi, lalu masuk.');
     } on AuthException catch (e) {
       setState(() => _regError = _xlErr(e.message));
     } catch (_) {
-      setState(() => _regError = 'Terjadi kesalahan. Coba lagi.');
+      setState(() => _regError = 'Terjadi kesalahan pendaftaran. Coba lagi.');
     } finally {
       if (mounted) setState(() => _regLoading = false);
     }
   }
 
   String _xlErr(String m) {
-    if (m.contains('Invalid login'))      return 'Email atau password salah.';
-    if (m.contains('Email not confirmed')) return 'Email belum dikonfirmasi. Cek inbox-mu.';
-    if (m.contains('User not found'))     return 'Akun tidak ditemukan.';
+    if (m.contains('Invalid login')) return 'Email atau password salah.';
+    if (m.contains('Email not confirmed')) return 'Email belum dikonfirmasi. Cek kotak masuk email kamu.';
+    if (m.contains('User not found')) return 'Akun tidak ditemukan.';
     if (m.contains('already registered')) return 'Email sudah terdaftar.';
-    if (m.contains('weak password'))      return 'Password terlalu lemah (min. 6 karakter).';
+    if (m.contains('weak password')) return 'Password terlalu lemah (min. 6 karakter).';
     return m;
   }
 
-  // ── build ───────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _A.bg,
-      body: Stack(children: [
-        // Animated background
-        AnimatedBuilder(
-          animation: _bgAnim,
-          builder: (_, __) => CustomPaint(
-            painter: _BgPainter(_bgAnim.value),
-            size: MediaQuery.of(context).size,
-          ),
-        ),
-
-        SafeArea(
-          child: FadeTransition(
-            opacity: _fadeAnim,
-            child: SlideTransition(
-              position: _slideAnim,
-              child: Column(children: [
-                const SizedBox(height: 32),
-                _buildLogo(),
-                const SizedBox(height: 36),
-                _buildTabBar(),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tab,
-                    children: [
-                      _buildLoginTab(),
-                      _buildRegisterTab(),
-                    ],
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+            position: _slideAnim,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  _buildBrandHeader(),
+                  const SizedBox(height: 24),
+                  _buildTabSelector(),
+                  const SizedBox(height: 20),
+                  // Form Card
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFFFFFFF), Color(0xFFFFFBF8)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFFED7AA)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE57A38).withOpacity(0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(20),
+                    child: AnimatedBuilder(
+                      animation: _tab,
+                      builder: (context, _) {
+                        return _tab.index == 0 ? _buildLoginForm() : _buildRegisterForm();
+                      },
+                    ),
                   ),
-                ),
-              ]),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),
-      ]),
+      ),
     );
   }
 
-  // ── logo ────────────────────────────────
-  Widget _buildLogo() {
-    return Column(children: [
-      // App icon with gradient ring
-      Container(
-        width: 72, height: 72,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              colors: [_A.orange, _A.orangeL],
+  Widget _buildBrandHeader() {
+    return Column(
+      children: [
+        Container(
+          width: 68,
+          height: 68,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE57A38), Color(0xFFC25E21)],
               begin: Alignment.topLeft,
-              end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(22),
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE57A38).withOpacity(0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.directions_car_rounded,
+            color: Colors.white,
+            size: 36,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'DRIVING',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              'BUDDY',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: Color(0xFFE57A38),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              width: 7,
+              height: 7,
+              decoration: const BoxDecoration(
+                color: Color(0xFF10B981),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'GT Telemetri Kabin & Monitoring Kelelahan',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabSelector() {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: TabBar(
+        controller: _tab,
+        indicator: BoxDecoration(
+          color: const Color(0xFFE57A38),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-                color: _A.orange.withOpacity(0.4),
-                blurRadius: 24,
-                offset: const Offset(0, 8)),
+              color: const Color(0xFFE57A38).withOpacity(0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
-        child: const Icon(Icons.directions_car_rounded,
-            color: Colors.white, size: 38),
-      ),
-      const SizedBox(height: 16),
-      const Text.rich(TextSpan(children: [
-        TextSpan(
-          text: 'DRIVING',
-          style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 3),
-        ),
-        TextSpan(
-          text: ' BUDDY',
-          style: TextStyle(
-              color: _A.orange,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 3),
-        ),
-      ])),
-      const SizedBox(height: 6),
-      Text(
-        'Berkendara Lebih Aman, Setiap Hari',
-        style: TextStyle(
-            color: _A.grey, fontSize: 13, letterSpacing: 0.3),
-      ),
-    ]);
-  }
-
-  // ── tab bar ─────────────────────────────
-  Widget _buildTabBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: _A.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _A.border),
-        ),
-        child: TabBar(
-          controller: _tab,
-          indicator: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [_A.orange, _A.orangeL]),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          indicatorSize: TabBarIndicatorSize.tab,
-          dividerColor: Colors.transparent,
-          labelColor: Colors.white,
-          unselectedLabelColor: _A.grey,
-          labelStyle: const TextStyle(
-              fontWeight: FontWeight.w700, fontSize: 14),
-          tabs: const [
-            Tab(text: 'Masuk'),
-            Tab(text: 'Daftar'),
-          ],
-        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: Colors.white,
+        unselectedLabelColor: const Color(0xFF64748B),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        onTap: (index) => setState(() {}),
+        tabs: const [
+          Tab(text: 'Masuk'),
+          Tab(text: 'Daftar Baru'),
+        ],
       ),
     );
   }
 
-  // ── login tab ───────────────────────────
-  Widget _buildLoginTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 28),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _buildLoginForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         if (_loginError != null) ...[
-          _Alert(msg: _loginError!, isError: true),
+          _buildAlertBox(_loginError!, isError: true),
           const SizedBox(height: 16),
         ],
 
-        _FieldLabel('Email'),
-        const SizedBox(height: 8),
-        _Field(
-          ctrl: _loginEmail,
+        _buildLabel('Email Pengemudi'),
+        const SizedBox(height: 6),
+        _buildInputField(
+          controller: _loginEmail,
           hint: 'nama@email.com',
           icon: Icons.alternate_email_rounded,
-          type: TextInputType.emailAddress,
+          keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 16),
 
-        _FieldLabel('Password'),
-        const SizedBox(height: 8),
-        _Field(
-          ctrl: _loginPassword,
+        _buildLabel('Kata Sandi'),
+        const SizedBox(height: 6),
+        _buildInputField(
+          controller: _loginPassword,
           hint: '••••••••',
           icon: Icons.lock_outline_rounded,
-          obscure: _loginObscure,
+          obscureText: _loginObscure,
           suffix: IconButton(
             icon: Icon(
-              _loginObscure
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              color: _A.grey, size: 20,
+              _loginObscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              color: const Color(0xFF64748B),
+              size: 20,
             ),
             onPressed: () => setState(() => _loginObscure = !_loginObscure),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 22),
 
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text('Lupa password?',
-              style: TextStyle(
-                  color: _A.orange, fontSize: 12, fontWeight: FontWeight.w600)),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _loginLoading ? null : _doLogin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE57A38),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 4,
+              shadowColor: const Color(0xFFE57A38).withOpacity(0.35),
+            ),
+            child: _loginLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  )
+                : const Text(
+                    'Masuk ke Cockpit',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                  ),
+          ),
         ),
-        const SizedBox(height: 28),
-
-        _PrimaryBtn(
-          label: 'Masuk',
-          loading: _loginLoading,
-          onTap: _doLogin,
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
 
         Center(
           child: GestureDetector(
-            onTap: () => _tab.animateTo(1),
-            child: Text.rich(TextSpan(children: [
+            onTap: () {
+              _tab.animateTo(1);
+              setState(() {});
+            },
+            child: Text.rich(
               TextSpan(
-                  text: 'Belum punya akun? ',
-                  style: TextStyle(color: _A.grey, fontSize: 13)),
-              TextSpan(
-                text: 'Daftar sekarang',
-                style: TextStyle(
-                    color: _A.orange,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700),
+                children: const [
+                  TextSpan(
+                    text: 'Belum punya akun? ',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  ),
+                  TextSpan(
+                    text: 'Daftar sekarang',
+                    style: TextStyle(
+                      color: Color(0xFFE57A38),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-            ])),
+            ),
           ),
         ),
-      ]),
+      ],
     );
   }
 
-  // ── register tab ────────────────────────
-  Widget _buildRegisterTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 28),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _buildRegisterForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         if (_regSuccess != null) ...[
-          _Alert(msg: _regSuccess!, isError: false),
+          _buildAlertBox(_regSuccess!, isError: false),
           const SizedBox(height: 16),
         ],
         if (_regError != null) ...[
-          _Alert(msg: _regError!, isError: true),
+          _buildAlertBox(_regError!, isError: true),
           const SizedBox(height: 16),
         ],
 
-        _FieldLabel('Nama Lengkap'),
-        const SizedBox(height: 8),
-        _Field(
-            ctrl: _regName,
-            hint: 'Nama kamu',
-            icon: Icons.person_outline_rounded),
-        const SizedBox(height: 16),
+        _buildLabel('Nama Lengkap'),
+        const SizedBox(height: 6),
+        _buildInputField(
+          controller: _regName,
+          hint: 'Contoh: Adrian Hartono',
+          icon: Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 14),
 
-        _FieldLabel('Email'),
-        const SizedBox(height: 8),
-        _Field(
-            ctrl: _regEmail,
-            hint: 'nama@email.com',
-            icon: Icons.alternate_email_rounded,
-            type: TextInputType.emailAddress),
-        const SizedBox(height: 16),
+        _buildLabel('Email Pengemudi'),
+        const SizedBox(height: 6),
+        _buildInputField(
+          controller: _regEmail,
+          hint: 'nama@email.com',
+          icon: Icons.alternate_email_rounded,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 14),
 
-        _FieldLabel('Password'),
-        const SizedBox(height: 8),
-        _Field(
-          ctrl: _regPassword,
-          hint: 'Min. 6 karakter',
+        _buildLabel('Kata Sandi'),
+        const SizedBox(height: 6),
+        _buildInputField(
+          controller: _regPassword,
+          hint: 'Minimal 6 karakter',
           icon: Icons.lock_outline_rounded,
-          obscure: _regObscure,
+          obscureText: _regObscure,
           suffix: IconButton(
             icon: Icon(
-              _regObscure
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              color: _A.grey, size: 20,
+              _regObscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              color: const Color(0xFF64748B),
+              size: 20,
             ),
             onPressed: () => setState(() => _regObscure = !_regObscure),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
-        _FieldLabel('Konfirmasi Password'),
-        const SizedBox(height: 8),
-        _Field(
-            ctrl: _regConfirm,
-            hint: 'Ulangi password',
-            icon: Icons.lock_outline_rounded,
-            obscure: true),
-        const SizedBox(height: 28),
-
-        _PrimaryBtn(
-          label: 'Buat Akun',
-          loading: _regLoading,
-          onTap: _doRegister,
+        _buildLabel('Konfirmasi Kata Sandi'),
+        const SizedBox(height: 6),
+        _buildInputField(
+          controller: _regConfirm,
+          hint: 'Ulangi kata sandi',
+          icon: Icons.lock_outline_rounded,
+          obscureText: true,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
+
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _regLoading ? null : _doRegister,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE57A38),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 4,
+              shadowColor: const Color(0xFFE57A38).withOpacity(0.35),
+            ),
+            child: _regLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  )
+                : const Text(
+                    'Buat Akun Pengemudi',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 18),
 
         Center(
           child: GestureDetector(
-            onTap: () => _tab.animateTo(0),
-            child: Text.rich(TextSpan(children: [
+            onTap: () {
+              _tab.animateTo(0);
+              setState(() {});
+            },
+            child: Text.rich(
               TextSpan(
-                  text: 'Sudah punya akun? ',
-                  style: TextStyle(color: _A.grey, fontSize: 13)),
-              TextSpan(
-                text: 'Masuk',
-                style: TextStyle(
-                    color: _A.orange,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700),
+                children: const [
+                  TextSpan(
+                    text: 'Sudah punya akun? ',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  ),
+                  TextSpan(
+                    text: 'Masuk',
+                    style: TextStyle(
+                      color: Color(0xFFE57A38),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-            ])),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-      ]),
+      ],
     );
   }
-}
 
-// ─────────────────────────────────────────────────────
-//  HELPER WIDGETS
-// ─────────────────────────────────────────────────────
-
-class _FieldLabel extends StatelessWidget {
-  final String text;
-  const _FieldLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Text(text,
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
       style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.3));
-}
+        fontSize: 12.5,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF0F172A),
+      ),
+    );
+  }
 
-class _Field extends StatelessWidget {
-  final TextEditingController ctrl;
-  final String hint;
-  final IconData icon;
-  final TextInputType? type;
-  final bool obscure;
-  final Widget? suffix;
-  const _Field({
-    required this.ctrl,
-    required this.hint,
-    required this.icon,
-    this.type,
-    this.obscure = false,
-    this.suffix,
-  });
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+    Widget? suffix,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: TextField(
-        controller: ctrl,
-        obscureText: obscure,
-        keyboardType: type,
-        cursorColor: _A.orange,
+        controller: controller,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        cursorColor: const Color(0xFFE57A38),
         style: const TextStyle(
-          color: Colors.black,
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
+          color: Color(0xFF0F172A), // Font hitam pekat jelas
+          fontSize: 14.5,
+          fontWeight: FontWeight.w700,
         ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-          prefixIcon: Icon(icon, color: const Color(0xFF6B7280), size: 20),
+          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5, fontWeight: FontWeight.normal),
+          prefixIcon: Icon(icon, color: const Color(0xFF64748B), size: 19),
           suffixIcon: suffix,
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         ),
       ),
     );
   }
-}
 
-class _PrimaryBtn extends StatelessWidget {
-  final String label;
-  final bool loading;
-  final VoidCallback onTap;
-  const _PrimaryBtn(
-      {required this.label, required this.loading, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: loading ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: double.infinity,
-        height: 52,
-        decoration: BoxDecoration(
-          gradient: loading
-              ? const LinearGradient(colors: [Color(0xFF4B5563), Color(0xFF4B5563)])
-              : const LinearGradient(
-                  colors: [_A.orange, _A.orangeL],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: loading
-              ? []
-              : [
-                  BoxShadow(
-                      color: _A.orange.withOpacity(0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8))
-                ],
-        ),
-        child: Center(
-          child: loading
-              ? const SizedBox(
-                  width: 22, height: 22,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2.5))
-              : Text(label,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5)),
-        ),
-      ),
-    );
-  }
-}
+  Widget _buildAlertBox(String msg, {required bool isError}) {
+    final color = isError ? const Color(0xFFD94126) : const Color(0xFF059669);
+    final bgColor = isError ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5);
+    final borderColor = isError ? const Color(0xFFFECACA) : const Color(0xFFA7F3D0);
 
-class _Alert extends StatelessWidget {
-  final String msg;
-  final bool isError;
-  const _Alert({required this.msg, required this.isError});
-  @override
-  Widget build(BuildContext context) {
-    final c = isError ? _A.danger : _A.success;
-    final icon = isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: c.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: c.withOpacity(0.3), width: 1.5),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
-      child: Row(children: [
-        Icon(icon, color: c, size: 18),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Text(msg,
-                style: TextStyle(color: c, fontSize: 13, height: 1.4))),
-      ]),
+      child: Row(
+        children: [
+          Icon(
+            isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+            color: color,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              msg,
+              style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.3),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// Keep RegisterScreen as alias for nav compatibility
+// Keep RegisterScreen alias
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return const LoginScreen();

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
-import 'auth_screen.dart';
 import 'core/app_colors.dart';
 import 'routes/app_routes.dart';
 

@@ -2,9 +2,8 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum AlertImageMode {
-  defaultMeme,
-  custom,
   none,
+  custom,
 }
 
 enum AlertAudioType {
@@ -21,21 +20,20 @@ class AlertConfig {
   static const _keyCustomAudioPath = 'alert_custom_audio_path';
   static const _keyCustomAudioName = 'alert_custom_audio_name';
 
-  /// Mendapatkan mode gambar alert yang sedang aktif
+  /// Mendapatkan mode gambar alert yang sedang aktif (default: none / tanpa meme)
   static Future<AlertImageMode> getImageMode() async {
     final prefs = await SharedPreferences.getInstance();
-    final mode = prefs.getString(_keyImageMode) ?? 'default';
+    final mode = prefs.getString(_keyImageMode) ?? 'none';
     switch (mode) {
       case 'custom':
         final path = prefs.getString(_keyCustomImagePath) ?? '';
         if (path.isNotEmpty && File(path).existsSync()) {
           return AlertImageMode.custom;
         }
-        return AlertImageMode.defaultMeme;
-      case 'none':
         return AlertImageMode.none;
+      case 'none':
       default:
-        return AlertImageMode.defaultMeme;
+        return AlertImageMode.none;
     }
   }
 
@@ -53,9 +51,6 @@ class AlertConfig {
   static Future<void> setImageMode(AlertImageMode mode, {String? customPath}) async {
     final prefs = await SharedPreferences.getInstance();
     switch (mode) {
-      case AlertImageMode.defaultMeme:
-        await prefs.setString(_keyImageMode, 'default');
-        break;
       case AlertImageMode.custom:
         await prefs.setString(_keyImageMode, 'custom');
         if (customPath != null && customPath.isNotEmpty) {

@@ -6,7 +6,7 @@ import 'monitor_screen.dart';
 import 'history_screen.dart';
 
 // ============================================================================
-// MAIN SHELL — 3-Tab BottomNavigationBar (Cockpit / Monitor / Riwayat)
+// MAIN SHELL — Luxury GT Navigation Bar
 // ============================================================================
 
 class MainShell extends StatefulWidget {
@@ -42,54 +42,73 @@ class _MainShellState extends State<MainShell> {
           const HistoryScreen(),
         ],
       ),
-      // ── Floating pill bottom nav ──
-      bottomNavigationBar: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.only(bottom: 12),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Container(
-              height: 66,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1C2333),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.97),
+          border: Border(
+            top: BorderSide(
+              color: AppColors.cardBorder.withOpacity(0.7),
+              width: 1,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE57A38).withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 72,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _NavItem(
+                  icon: Icons.dashboard_rounded,
+                  label: 'Beranda',
+                  isSelected: _currentIndex == 0,
+                  onTap: () => _switchToTab(0),
+                ),
+                // Center Floating Drive / Monitoring Button
+                GestureDetector(
+                  onTap: () => _switchToTab(1),
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE57A38), Color(0xFFC25E21)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE57A38).withOpacity(0.45),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      _currentIndex == 1
+                          ? Icons.videocam_rounded
+                          : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _NavItem(
-                    icon: Icons.dashboard_rounded,
-                    label: 'Cockpit',
-                    index: 0,
-                    current: _currentIndex,
-                    onTap: _switchToTab,
-                  ),
-                  _NavItem(
-                    icon: Icons.videocam_rounded,
-                    label: 'Monitor',
-                    index: 1,
-                    current: _currentIndex,
-                    onTap: _switchToTab,
-                    isCenter: true,
-                  ),
-                  _NavItem(
-                    icon: Icons.history_rounded,
-                    label: 'Riwayat',
-                    index: 2,
-                    current: _currentIndex,
-                    onTap: _switchToTab,
-                  ),
-                ],
-              ),
+                ),
+                _NavItem(
+                  icon: Icons.analytics_rounded,
+                  label: 'Aktivitas',
+                  isSelected: _currentIndex == 2,
+                  onTap: () => _switchToTab(2),
+                ),
+              ],
             ),
           ),
         ),
@@ -101,90 +120,42 @@ class _MainShellState extends State<MainShell> {
 class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
-  final int index;
-  final int current;
-  final ValueChanged<int> onTap;
-  final bool isCenter;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   const _NavItem({
     required this.icon,
     required this.label,
-    required this.index,
-    required this.current,
+    required this.isSelected,
     required this.onTap,
-    this.isCenter = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isActive = current == index;
-
-    if (isCenter) {
-      return GestureDetector(
-        onTap: () => onTap(index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: isActive
-                ? const LinearGradient(
-                    colors: [AppColors.primary, AppColors.accent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : const LinearGradient(
-                    colors: [Color(0xFF252D3F), Color(0xFF252D3F)]),
-            shape: BoxShape.circle,
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.5),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-                : [],
-          ),
-          child: Icon(icon,
-              color: isActive ? Colors.white : const Color(0xFF6B7280),
-              size: 26),
-        ),
-      );
-    }
+    final color = isSelected ? AppColors.primary : AppColors.textSecondary;
 
     return GestureDetector(
-      onTap: () => onTap(index),
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 80,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primary.withOpacity(0.18)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon,
-                  color: isActive
-                      ? AppColors.primary
-                      : const Color(0xFF6B7280),
-                  size: 22),
+            Icon(
+              icon,
+              color: color,
+              size: 24,
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color:
-                    isActive ? AppColors.primary : const Color(0xFF6B7280),
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: color,
+                letterSpacing: 0.2,
               ),
             ),
           ],
