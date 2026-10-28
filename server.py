@@ -50,6 +50,13 @@ MOUTH_OUTER = [61, 291, 39, 181, 0, 17, 269, 405]
 mp_face_mesh = mp.solutions.face_mesh
 app = FastAPI()
 
+# Chat LLM (POST /chat). Opsional: kalau modul gagal dimuat, deteksi kantuk tetap jalan.
+try:
+    from llm_chat import build_router
+    app.include_router(build_router())
+except Exception as e:
+    print(f"[WARN] Modul LLM tidak dimuat: {e}")
+
 # =====================================================================
 # 2. FUNGSI KALKULASI GEOMETRI WAJAH
 # =====================================================================
@@ -342,6 +349,7 @@ if __name__ == "__main__":
     print(" [START] DRIVING BUDDY - WEBSOCKET SERVER")
     print("=" * 60)
     print(" Endpoint : ws://[IP_LAPTOP]:8000/ws")
+    print(" Chat LLM : POST http://[IP_LAPTOP]:8000/chat  (cek: /chat/health, dokumen API: /docs)")
     print(" Model    : Google MediaPipe Face Mesh (Pretrained)")
     print(" Ctrl+C   : Hentikan server")
     print("=" * 60)

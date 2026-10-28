@@ -1,0 +1,6 @@
+# Dependensi modul llm_chat. server.py sudah memakai fastapi + uvicorn.
+# Install:  pip install -r requirements-llm.txt
+fastapi>=0.110
+uvicorn>=0.27
+pydantic>=2.5
+httpx>=0.27
